@@ -37,12 +37,12 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import tables as tb
 import numpy as np
-import glob,unittest,cPickle,sys,os,gc
+import glob, unittest, pickle, sys, os, gc
 
-from utilities import standardize, corrmatrix, construct_file_name, deconstruct_file_name
-from runlogger import Logger
+from .utilities import standardize, corrmatrix, construct_file_name, deconstruct_file_name
+from .runlogger import Logger
 
-from scipy import corrcoef,histogram
+from scipy import corrcoef, histogram
 
 # decorator for logging
 log_function_call = Logger.log_function_call
@@ -50,31 +50,31 @@ log_function_call = Logger.log_function_call
 """Exceptions for the RAICAR class."""
 class RAICARICAException(Exception):
     def __init__(self):
-        print "No ICA realizations have been computed.  Run kica() first."
+        print("No ICA realizations have been computed.  Run kica() first.")
 
 class RAICARRabException(Exception):
     def __init__(self):
-        print "R(a,b) matrices have not been computed.  Run compute_rab() first."
+        print("R(a,b) matrices have not been computed.  Run compute_rab() first.")
 
 class RAICARAlignmentException(Exception):
     def __init__(self):
-        print "No alignment information has been determined.  Run compute_component_alignments() first."
+        print("No alignment information has been determined.  Run compute_component_alignments() first.")
 
 class RAICARComponentException(Exception):
     def __init__(self):
-        print "No RAICAR components have been calculated yet."
+        print("No RAICAR components have been calculated yet.")
 
 class RAICARDirectoryIOException(Exception):
     def __init__(self):
-        print "There is a problem with your input project directory.  Check the path name."
+        print("There is a problem with your input project directory.  Check the path name.")
 
 class RAICARProjectCleanException(Exception):
-    def __init__(self,dir):
-        print "Nothing to clean: directory %s does not exist" % dir
+    def __init__(self, dir):
+        print("Nothing to clean: directory %s does not exist" % dir)
 
 class RAICARDirectoryExistException(Exception):
-    def __init__(self,dir):
-        print "Project subdirectory %s does not exist" % dir
+    def __init__(self, dir):
+        print("Project subdirectory %s does not exist" % dir)
 
 
 class RAICAR(object):
@@ -156,10 +156,10 @@ class RAICAR(object):
             os.mkdir(projDirectory)
         # create a new project
         self.projDirectory = projDirectory
-        self.icaDirectory = os.path.join(self.projDirectory,'ica')
-        self.rabDirectory = os.path.join(self.projDirectory,'rab')
-        self.alnDirectory = os.path.join(self.projDirectory,'aln')
-        self.racDirectory = os.path.join(self.projDirectory,'rac')
+        self.icaDirectory = os.path.join(self.projDirectory, 'ica')
+        self.rabDirectory = os.path.join(self.projDirectory, 'rab')
+        self.alnDirectory = os.path.join(self.projDirectory, 'aln')
+        self.racDirectory = os.path.join(self.projDirectory, 'rac')
         self.K = K
         self.avgMethod = avgMethod
         self.canonSigns = canonSigns
@@ -195,57 +195,57 @@ class RAICAR(object):
         the realization indices (a,b), value (maxElem), and component indices (m,n) are returned as a tuple.
         '''
         # ((a,b),value,(m,n) for every matrix) max value in each matrix
-        matrixMax = [(k,self.RabDict[k].max(),np.unravel_index(self.RabDict[k].argmax(),self.RabDict[k].shape)) for k in self.RabDict]
+        matrixMax = [(k, self.RabDict[k].max(), np.unravel_index(self.RabDict[k].argmax(), self.RabDict[k].shape)) for k in self.RabDict]
         # maximum of the maxima
-        bigIndx = np.argmax(zip(*matrixMax)[1])
+        bigIndx = np.argmax(list(zip(*matrixMax))[1])
         return matrixMax[bigIndx]
 
 
-    def search_realizations(self,rzIndx,compIndx):
+    def search_realizations(self, rzIndx, compIndx):
         '''
         Accepts an (a,b) tuple of realizations (rzIndx) and an (m,n) tuple of component indices (compIndx) and
         searches all the other K-2 realizations for components to match with C_am and C_bn.  Each run of
         search_realizations() returns a tuple of ints toAlign = (c0,c1,...,cK-1) which gives
         components to group - c0 goes with realization 0, etc.
         '''
-        a,b = rzIndx
-        m,n = compIndx
-        rzToSearch = [x for x in xrange(0,self.K) if x is not a and x is not b]
-        toAlign = [(a,m),(b,n)]
+        a, b = rzIndx
+        m, n = compIndx
+        rzToSearch = [x for x in range(0, self.K) if x is not a and x is not b]
+        toAlign = [(a, m), (b, n)]
         for r in rzToSearch:
-            rzOne = [a,r]
-            rzTwo = [r,b]
+            rzOne = [a, r]
+            rzTwo = [r, b]
             # row/col search is tricky because of RabDict storage
             if rzOne[0] > rzOne[1]:
                 # search the transpose
-                x = (rzOne[1],rzOne[0])
+                x = (rzOne[1], rzOne[0])
                 Mrow = self.RabDict[x].T
             else:
                 Mrow = self.RabDict[tuple(rzOne)]
             if rzTwo[0] > rzTwo[1]:
                 # search the transpose
-                x = (rzTwo[1],rzTwo[0])
+                x = (rzTwo[1], rzTwo[0])
                 Mcol = self.RabDict[x].T
             else:
                 Mcol = self.RabDict[tuple(rzTwo)]
-            (rowMax,pi) = (Mrow[m,:].max(),Mrow[m,:].argmax())
-            (colMax,qi) = (Mcol[:,n].max(),Mcol[:,n].argmax())
+            (rowMax, pi) = (Mrow[m,:].max(), Mrow[m,:].argmax())
+            (colMax, qi) = (Mcol[:, n].max(), Mcol[:, n].argmax())
             # this will do the right thing whether pi = qi or not
             whichComp = pi if rowMax > colMax else qi
-            toAlign.append((r,whichComp))
+            toAlign.append((r, whichComp))
         toAlign.sort()
         return list(zip(*toAlign)[1])
 
 
-    def reduce_rab(self,toAlign):
+    def reduce_rab(self, toAlign):
         '''
         Deletes a single row and column from each of the Rab matrices.
         '''
-        for r1 in range(0,self.K):
-            for r2 in range(r1+1,self.K):
-                rz = (r1,r2)
-                rcDel = (toAlign[r1],toAlign[r2])
-                self.RabDict[rz] = np.delete(np.delete(self.RabDict[rz],rcDel[0],0),rcDel[1],1)
+        for r1 in range(0, self.K):
+            for r2 in range(r1+1, self.K):
+                rz = (r1, r2)
+                rcDel = (toAlign[r1], toAlign[r2])
+                self.RabDict[rz] = np.delete(np.delete(self.RabDict[rz], rcDel[0], 0), rcDel[1], 1)
 
 
     def correct_alignment(self):
@@ -259,33 +259,33 @@ class RAICAR(object):
             raise RAICARAlignmentException
         newIndexSet = []
         # using alignDict.values() may or may not be safe.
-        for k in range(0,self.K):
-            newIndexSet.append(self.index_remap((np.asarray(self.alignDict.values())[:,k]).tolist()))
+        for k in range(0, self.K):
+            newIndexSet.append(self.index_remap((np.asarray(list(self.alignDict.values()))[:, k]).tolist()))
         for k in self.alignDict:
             self.alignDict[k] = ((np.asarray(newIndexSet).T)[k,:]).tolist()
 
 
-    def index_remap(self,indToRemap):
+    def index_remap(self, indToRemap):
         '''
         Remaps one set of indices from a complete decimation from relative to absolute indices - necessary
         for nondestructively constructing the raicar alignments.
         '''
         remappedIndex = [0 for k in indToRemap]
         i_r = dict()
-        for k in range(0,len(indToRemap)-1):
-            i_r[k] = {}.fromkeys(range(0,len(indToRemap)-k-1))
-        for oKey in i_r.keys():
-            for iKey in i_r[oKey].keys():
+        for k in range(0, len(indToRemap)-1):
+            i_r[k] = {}.fromkeys(list(range(0, len(indToRemap)-k-1)))
+        for oKey in list(i_r.keys()):
+            for iKey in list(i_r[oKey].keys()):
                 i_r[oKey][iKey] = iKey if iKey < indToRemap[oKey] else iKey+1
-        for posToRemap in range(0,len(indToRemap)):
+        for posToRemap in range(0, len(indToRemap)):
             temp_remap = indToRemap[posToRemap]
-            for k in range(posToRemap-1,-1,-1):
+            for k in range(posToRemap-1, -1, -1):
                 temp_remap = i_r[k][temp_remap]
             remappedIndex[posToRemap] = temp_remap
         return remappedIndex
 
     @log_function_call('Canonicalizing signs')
-    def canonicalize_signs(self,sources,mixing):
+    def canonicalize_signs(self, sources, mixing):
         '''
         Accepts an set of sources and corresponding mixing matrices from an ICA component (should be a realization component,
         as this operation makes no sense for regular ICA realizations) and fixes the signs of the realizations, using the sign
@@ -295,37 +295,37 @@ class RAICAR(object):
         the 'well matched' components to have the same sign.
         '''
         compSigns = np.sign(corrcoef(sources)[0,:])
-        for i in range(1,sources.shape[0]):
+        for i in range(1, sources.shape[0]):
             sources[i,:] = compSigns[i]*sources[i,:]
-            mixing[:,i] = compSigns[i]*mixing[:,i]
-        return sources,mixing
+            mixing[:, i] = compSigns[i]*mixing[:, i]
+        return sources, mixing
 
     @log_function_call('Selectively averaging aligned components')
-    def selective_average_aligned_runs(self,sources,mixing):
+    def selective_average_aligned_runs(self, sources, mixing):
         '''
         Averages one aligned ICA run and calculates a reproducibility index.  This version uses the original
         definition in Yang et al.
         '''
         # threshold for inclusion
         thresh = 0.7
-        corrsToSum = np.triu(np.abs(corrcoef(sources)),1).flatten()
+        corrsToSum = np.triu(np.abs(corrcoef(sources)), 1).flatten()
         rep = (corrsToSum[np.nonzero(corrsToSum > thresh)].sum())/(0.5*self.K*(self.K-1))
         # now only add a component to the average if there is at least one correlation with the other RCs > threshold
         #    the > 1 statement is because the diagonal elements are always 1.0, so there will always be at least one
         #    cross-correlation (namely self-correlation) which is bigger than 1
         toInclude = ((np.abs(corrcoef(sources)) > thresh).sum(axis=0) > 1)
-        return sources[toInclude,:].mean(axis=0),mixing[:,toInclude].mean(axis=1),rep
+        return sources[toInclude,:].mean(axis=0), mixing[:, toInclude].mean(axis=1), rep
 
     @log_function_call('Weighted averaging aligned components')
-    def weighted_average_aligned_runs(self,sources,mixing):
+    def weighted_average_aligned_runs(self, sources, mixing):
         '''
         Averages one aligned ICA run and calculates the reproducibility for each component.  This version does not
         add only super-threshold CCs to the reproducibililty index, and it uses a weighted average to form the
         average components.  The weights are defined as w_i = sum_{j neq i} SCC(i,j).
         '''
-        rep = np.triu(np.abs(corrcoef(sources)),1).sum()/(0.5*self.K*(self.K-1))
-        rWeights = np.asarray([(np.abs(corrcoef(sources)[j,:]).sum() - 1.0)/(sources.shape[0]-1) for j in range(0,sources.shape[0])])[:,np.newaxis]
-        return ((rWeights*sources).sum(axis=0))/(rWeights.sum()),((mixing*rWeights.T).sum(axis=1))/(rWeights.sum()),rep
+        rep = np.triu(np.abs(corrcoef(sources)), 1).sum()/(0.5*self.K*(self.K-1))
+        rWeights = np.asarray([(np.abs(corrcoef(sources)[j,:]).sum() - 1.0)/(sources.shape[0]-1) for j in range(0, sources.shape[0])])[:, np.newaxis]
+        return ((rWeights*sources).sum(axis=0))/(rWeights.sum()), ((mixing*rWeights.T).sum(axis=1))/(rWeights.sum()), rep
 
     @log_function_call('Cleaning project')
     def clean_project(self):
@@ -333,18 +333,18 @@ class RAICAR(object):
         Removes all files in the subdirectories of the project directory, as well as the directories.
         Subdirectories which do not exist (having not yet been created) are skipped.
         '''
-        projDirectories = [self.icaDirectory,self.rabDirectory,self.alnDirectory,self.racDirectory]
+        projDirectories = [self.icaDirectory, self.rabDirectory, self.alnDirectory, self.racDirectory]
         for d in projDirectories:
             if not os.path.exists(d):
-                print "Nothing to clean: directory %s does not exist" % d
+                print("Nothing to clean: directory %s does not exist" % d)
             else:
-                print "Cleaning %s" % d
+                print("Cleaning %s" % d)
                 files = os.listdir(d)
                 for f in files:
-                    os.remove(os.path.join(d,f))
+                    os.remove(os.path.join(d, f))
 
     @log_function_call('Running K-fold ICA')
-    def kica(self,X):
+    def kica(self, X):
         '''
         Runs K realizations of ICA (method dictated by constructor argument icaMethod), decomposing data matrix X
         into A*S, for sources S and mixing matrix A.  Resulting realizations are stored in a PyTable in
@@ -357,21 +357,21 @@ class RAICAR(object):
                 pass
         gc.collect()
         # files to construct
-        icaToMake = [os.path.join(self.icaDirectory,construct_file_name('icaRun',x,'h5')) for x in range(0,self.K)]
+        icaToMake = [os.path.join(self.icaDirectory, construct_file_name('icaRun', x, 'h5')) for x in range(0, self.K)]
         if self.nSignals is None:
             self.nSignals = X.shape[0] # full decomp
         for icaFile in icaToMake:
             if not os.path.exists(icaFile):
-                print 'Running ICA realization %s' % icaFile
-                A,W,S = self.ica(X,nSources=self.nSignals,**self.icaOptions)
+                print('Running ICA realization %s' % icaFile)
+                A, W, S = self.ica(X, nSources=self.nSignals, **self.icaOptions)
                 # write the results to a PyTable
-                h5Ptr = tb.open_file(icaFile,mode="w",title='ICA Realization')
-                decomps = h5Ptr.create_group(h5Ptr.root,'decomps','ICA Decompositions')
-                h5Ptr.create_array(decomps,'sources',S,"S")
-                h5Ptr.create_array(decomps,'mixing',A,"A")
+                h5Ptr = tb.open_file(icaFile, mode="w", title='ICA Realization')
+                decomps = h5Ptr.create_group(h5Ptr.root, 'decomps', 'ICA Decompositions')
+                h5Ptr.create_array(decomps, 'sources', S, "S")
+                h5Ptr.create_array(decomps, 'mixing', A, "A")
                 h5Ptr.close()
             else:
-                print 'ICA realization %s already exists.  Skipping.' % icaFile
+                print('ICA realization %s already exists.  Skipping.' % icaFile)
 
     @log_function_call('Computing R(a,b) matrices')
     def compute_rab(self):
@@ -390,22 +390,22 @@ class RAICAR(object):
         if len(icaFiles) == 0:
             raise RAICARICAException
         for fi in icaFiles:
-            fiPtr = tb.open_file(os.path.join(self.icaDirectory,fi),'r')
+            fiPtr = tb.open_file(os.path.join(self.icaDirectory, fi), 'r')
             si = fiPtr.get_node('/decomps/sources').read()
             fiPtr.close()
             i = np.int(deconstruct_file_name(fi)[1])
-            print 'Working on R(%d,b)'%i
+            print('Working on R(%d,b)'%i)
             for fj in icaFiles:
                 j = np.int(deconstruct_file_name(fj)[1])
                 if j > i:
                     # sources assumed to have unit std. dev. but nonzero mean - will behave badly if not!
-                    fjPtr = tb.open_file(os.path.join(self.icaDirectory,fj),'r')
+                    fjPtr = tb.open_file(os.path.join(self.icaDirectory, fj), 'r')
                     sj = fjPtr.get_node('/decomps/sources').read()
                     fjPtr.close()
-                    self.RabDict[(i,j)] = np.abs(corrmatrix(si,sj))
+                    self.RabDict[(i, j)] = np.abs(corrmatrix(si, sj))
         # pickle the result
-        rabPtr = open(os.path.join(self.rabDirectory,'rabmatrix.db'),'wb')
-        cPickle.dump(self.RabDict,rabPtr,protocol=-1)
+        rabPtr = open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'wb')
+        pickle.dump(self.RabDict, rabPtr, protocol=-1)
         rabPtr.close()
 
 
@@ -415,14 +415,14 @@ class RAICAR(object):
         '''
         if not os.path.exists(self.rabDirectory):
             raise RAICARRabException
-        if not os.path.exists(os.path.join(self.rabDirectory,'rabmatrix.db')):
+        if not os.path.exists(os.path.join(self.rabDirectory, 'rabmatrix.db')):
             raise RAICARRabException
-        rabPtr = open(os.path.join(self.rabDirectory,'rabmatrix.db'),'rb')
-        RabDict = cPickle.load(rabPtr)
+        rabPtr = open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'rb')
+        RabDict = pickle.load(rabPtr)
         rabPtr.close()
-        rPDF = dict.fromkeys(['bin edges','counts','bar width'])
-        rPDF['bin edges'] = np.linspace(0,1.0,101)
-        rPDF['counts'],_ = histogram(a=np.hstack(RabDict.values()[i].flatten() for i in range(0,len(RabDict))),bins=rPDF['bin edges'])
+        rPDF = dict.fromkeys(['bin edges', 'counts', 'bar width'])
+        rPDF['bin edges'] = np.linspace(0, 1.0, 101)
+        rPDF['counts'], _ = histogram(a=np.hstack(list(RabDict.values())[i].flatten() for i in range(0, len(RabDict))), bins=rPDF['bin edges'])
         rPDF['bin edges'] = rPDF['bin edges'][0:-1]
         rPDF['bar width'] = 0.01
         return rPDF
@@ -440,12 +440,12 @@ class RAICAR(object):
             raise RAICARICAException
         # may not have computed R(a,b); try the version on disk
         if len(self.RabDict) == 0:
-            print 'No R(a,b) matrix currently in storage; trying version on disk.'
-            if not os.path.exists(os.path.join(self.rabDirectory,'rabmatrix.db')):
+            print('No R(a,b) matrix currently in storage; trying version on disk.')
+            if not os.path.exists(os.path.join(self.rabDirectory, 'rabmatrix.db')):
                 raise RAICARRabException
             else:
-                rabPtr = open(os.path.join(self.rabDirectory,'rabmatrix.db'),'rb')
-                self.RabDict = cPickle.load(rabPtr)
+                rabPtr = open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'rb')
+                self.RabDict = pickle.load(rabPtr)
                 rabPtr.close()
         if not os.path.exists(self.alnDirectory):
             try:
@@ -455,27 +455,27 @@ class RAICAR(object):
         gc.collect()
         # need to know how many components to calculate (if any runs exist,
         #    the zeroth one will)
-        f0Ptr = tb.open_file(os.path.join(self.icaDirectory,'icaRun_0.h5'),'r')
+        f0Ptr = tb.open_file(os.path.join(self.icaDirectory, 'icaRun_0.h5'), 'r')
         s0 = f0Ptr.get_node('/decomps/sources').read()
         f0Ptr.close()
         nComp = s0.shape[0]
         del s0
-        for k in range(0,nComp):
-            print 'Calculating alignment for component %d' % k
-            rzIndx,maxElem,compIndx = self.find_max_elem()
-            toAlign = self.search_realizations(rzIndx,compIndx)
+        for k in range(0, nComp):
+            print('Calculating alignment for component %d' % k)
+            rzIndx, maxElem, compIndx = self.find_max_elem()
+            toAlign = self.search_realizations(rzIndx, compIndx)
             self.alignDict[k] = toAlign
             # remove the appropriate rows/cols from Rab so the algorithm can continue
             self.reduce_rab(toAlign)
         # correct the alignment to use actual and not relative indices
         self.correct_alignment()
         # save the alignment
-        fPtr = open(os.path.join(self.alnDirectory,'alignments.db'),'wb')
-        cPickle.dump(self.alignDict,fPtr,protocol=-1)
+        fPtr = open(os.path.join(self.alnDirectory, 'alignments.db'), 'wb')
+        pickle.dump(self.alignDict, fPtr, protocol=-1)
         fPtr.close()
 
     @log_function_call('Aligning component')
-    def align_component(self,k):
+    def align_component(self, k):
         '''
         Uses the alignment dictionary to assemble a single aligned component, which will be subsequently
         averaged to make a raicar component.
@@ -487,37 +487,37 @@ class RAICAR(object):
             except OSError:
                 pass
         if len(self.alignDict) == 0:
-            print 'No alignment information currently in storage; trying version on disk.'
-            if not os.path.exists(os.path.join(self.alnDirectory,'alignments.db')):
+            print('No alignment information currently in storage; trying version on disk.')
+            if not os.path.exists(os.path.join(self.alnDirectory, 'alignments.db')):
                 raise RAICARAlignmentException
             else:
-                alnPtr = open(os.path.join(self.alnDirectory,'alignments.db'),'rb')
-                self.alignDict = cPickle.load(alnPtr)
+                alnPtr = open(os.path.join(self.alnDirectory, 'alignments.db'), 'rb')
+                self.alignDict = pickle.load(alnPtr)
                 alnPtr.close()
-        if not self.alignDict.has_key(k):
-            print 'Error.  Requested component %d does not exist.' % k
+        if k not in self.alignDict:
+            print('Error.  Requested component %d does not exist.' % k)
             return
         icaFiles = sorted(os.listdir(self.icaDirectory))
         if len(icaFiles) == 0:
             raise RAICARICAException
-        print 'Aligning component %d' % k
+        print('Aligning component %d' % k)
         sourcesToAlign = []
         mixColsToAlign = []
         for fi in icaFiles:
-            print 'Working on file %s' % fi
+            print('Working on file %s' % fi)
             i = np.int(deconstruct_file_name(fi)[1])
-            h5Ptr = tb.open_file(os.path.join(self.icaDirectory,fi),'r')
+            h5Ptr = tb.open_file(os.path.join(self.icaDirectory, fi), 'r')
             sourcesToAlign.append(h5Ptr.root.decomps.sources[self.alignDict[k][i],:])  # source to fetch
-            mixColsToAlign.append(h5Ptr.root.decomps.mixing[:,self.alignDict[k][i]]) # mixing element
+            mixColsToAlign.append(h5Ptr.root.decomps.mixing[:, self.alignDict[k][i]]) # mixing element
             h5Ptr.close()
         # source is aligned, form the aligned source and mixing matrix
         alignedSources = np.vstack(sourcesToAlign)
         alignedMixing = np.vstack(mixColsToAlign).T
-        fileName = os.path.join(self.alnDirectory,construct_file_name('alnRun',k,'h5'))
-        h5Ptr = tb.open_file(fileName,mode="w",title='Aligned Component')
-        aligned = h5Ptr.create_group(h5Ptr.root,'aligned','Aligned Component')
-        h5Ptr.create_array(aligned,'sources',alignedSources,"S")
-        h5Ptr.create_array(aligned,'mixing',alignedMixing,"A")
+        fileName = os.path.join(self.alnDirectory, construct_file_name('alnRun', k, 'h5'))
+        h5Ptr = tb.open_file(fileName, mode="w", title='Aligned Component')
+        aligned = h5Ptr.create_group(h5Ptr.root, 'aligned', 'Aligned Component')
+        h5Ptr.create_array(aligned, 'sources', alignedSources, "S")
+        h5Ptr.create_array(aligned, 'mixing', alignedMixing, "A")
         h5Ptr.close()
 
     @log_function_call('Constructing RAICAR components')
@@ -531,9 +531,9 @@ class RAICAR(object):
                 os.mkdir(self.racDirectory)
             except OSError:
                 pass
-        alnFiles = glob.glob(os.path.join(self.alnDirectory,'alnRun_*.h5'))
+        alnFiles = glob.glob(os.path.join(self.alnDirectory, 'alnRun_*.h5'))
         if len(alnFiles) == 0:
-            print 'ERROR :  Components have not been aligned yet.'
+            print('ERROR :  Components have not been aligned yet.')
             return
         # temp variables to hold the answer
         gc.collect()
@@ -541,15 +541,15 @@ class RAICAR(object):
         raicarMixing = []
         repro = []
         for f in alnFiles:
-            print 'Constructing raicar comfponent from file %s' % f
-            fPtr = tb.open_file(f,'r')
+            print('Constructing raicar comfponent from file %s' % f)
+            fPtr = tb.open_file(f, 'r')
             sc = fPtr.get_node('/aligned/sources').read()
             ac = fPtr.get_node('/aligned/mixing').read()
             fPtr.close()
             if self.canonSigns:
-                sc,ac = self.canonicalize_signs(sc,ac)
+                sc, ac = self.canonicalize_signs(sc, ac)
             methodToUse = self.avgMethod+'_average_aligned_runs'
-            avgSource,avgMix,rep = getattr(self,methodToUse)(sc,ac)
+            avgSource, avgMix, rep = getattr(self, methodToUse)(sc, ac)
             raicarSources.append(avgSource)
             raicarMixing.append(avgMix)
             repro.append(rep)
@@ -558,16 +558,16 @@ class RAICAR(object):
         self.raicarMixing = np.vstack(raicarMixing).T
         self.reproducibility = repro
         # adjust std. dev. of RAICAR sources
-        self.raicarSources = standardize(self.raicarSources,stdtype='row')
+        self.raicarSources = standardize(self.raicarSources, stdtype='row')
         # save the result, PyTables again
-        h5Ptr = tb.open_file(os.path.join(self.racDirectory,'components.h5'),mode="w",title='RAICAR Component')
-        raicar = h5Ptr.create_group(h5Ptr.root,'raicar','RAICAR Component')
-        h5Ptr.create_array(raicar,'sources',self.raicarSources,"S")
-        h5Ptr.create_array(raicar,'mixing',self.raicarMixing,"A")
+        h5Ptr = tb.open_file(os.path.join(self.racDirectory, 'components.h5'), mode="w", title='RAICAR Component')
+        raicar = h5Ptr.create_group(h5Ptr.root, 'raicar', 'RAICAR Component')
+        h5Ptr.create_array(raicar, 'sources', self.raicarSources, "S")
+        h5Ptr.create_array(raicar, 'mixing', self.raicarMixing, "A")
         h5Ptr.close()
         # this can just be pickled - it's not that large
-        fPtr = open(os.path.join(self.racDirectory,'reproducibility.db'),'wb')
-        cPickle.dump(self.reproducibility,fPtr,protocol=-1)
+        fPtr = open(os.path.join(self.racDirectory, 'reproducibility.db'), 'wb')
+        pickle.dump(self.reproducibility, fPtr, protocol=-1)
         fPtr.close()
 
 
@@ -578,15 +578,15 @@ class RAICAR(object):
         '''
         if not os.path.exists(self.racDirectory):
             raise RAICARDirectoryExistException(self.racDirectory)
-        elif not os.path.exists(os.path.join(self.racDirectory,'components.h5')):
+        elif not os.path.exists(os.path.join(self.racDirectory, 'components.h5')):
             raise RAICARComponentException
         # file exists and presumably has something in it
-        compFileName = os.path.join(self.racDirectory,'components.h5')
-        h5Ptr = tb.open_file(compFileName,mode="r")
+        compFileName = os.path.join(self.racDirectory, 'components.h5')
+        h5Ptr = tb.open_file(compFileName, mode="r")
         sources = h5Ptr.get_node('/raicar/sources').read()
         mixing = h5Ptr.get_node('/raicar/mixing').read()
         h5Ptr.close()
-        return sources,mixing
+        return sources, mixing
 
     def read_reproducibility(self):
         '''
@@ -595,14 +595,14 @@ class RAICAR(object):
         '''
         if not os.path.exists(self.racDirectory):
             raise RAICARDirectoryExistException(self.racDirectory)
-        elif not os.path.exists(os.path.join(self.racDirectory,'reproducibility.db')):
+        elif not os.path.exists(os.path.join(self.racDirectory, 'reproducibility.db')):
             raise RAICARComponentException
-        fPtr = open(os.path.join(self.racDirectory,'reproducibility.db'),'rb')
-        repro = cPickle.load(fPtr)
+        fPtr = open(os.path.join(self.racDirectory, 'reproducibility.db'), 'rb')
+        repro = pickle.load(fPtr)
         fPtr.close()
         return repro
 
-    def runall(self,X):
+    def runall(self, X):
         '''
         Runs the entire RAICAR pipeline, from ICA to RAICAR source construction and reproducibility
         calculation.
@@ -610,7 +610,7 @@ class RAICAR(object):
         self.kica(X)
         self.compute_rab()
         self.compute_component_alignments()
-        for k in xrange(self.nSignals):
+        for k in range(self.nSignals):
             self.align_component(k)
         self.construct_raicar_components()
         return

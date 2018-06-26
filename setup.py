@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup,Command
+from distutils.core import setup, Command
 
 class PyTest(Command):
     user_options =[]
@@ -9,8 +9,8 @@ class PyTest(Command):
     def finalize_options(self):
         pass
     def run(self):
-        import sys,subprocess
-        errno = subprocess.call([sys.executable,'tests/runtests.py'])
+        import sys, subprocess
+        errno = subprocess.call([sys.executable, 'tests/runtests.py'])
         raise SystemExit(errno)
 
 
@@ -22,7 +22,7 @@ setup(name='pycar',
       url='https://github.com/thelahunginjeet/pycar',
       packages=['pycar'],
       package_dir={'pycar': ''},
-      package_data={'pycar' : ['tests/runtests.py','tests/test_raicar_pytest.py','tests/test_bicar_pytest.py','tests/bicartestdata.db','tests/icatestsignals.db']},
+      package_data={'pycar' : ['tests/runtests.py', 'tests/test_raicar_pytest.py', 'tests/test_bicar_pytest.py', 'tests/bicartestdata.db', 'tests/icatestsignals.db']},
       install_requires = ['pyica'],
       cmdclass = {'test': PyTest},
       license='BSD-3',

@@ -33,17 +33,17 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
 from time import ctime
-import re,os
+import re, os
 from functools import wraps
 
 def clean_string(inputString):
-    parts = re.search("'(\w+\.\w+_'",inputString)
+    parts = re.search("'(\w+\.\w+_'", inputString)
     return parts.group(1)
 
 def create_footer(lkwargs):
     footer = ""
     for kw in lkwargs:
-        footer += "\t%s = %s\n"%(kw,lkwargs[kw])
+        footer += "\t%s = %s\n"%(kw, lkwargs[kw])
     return footer
 
 class Logger(object):
@@ -51,9 +51,9 @@ class Logger(object):
     Simple logger to auto-record algorithm options.
     '''
     @classmethod
-    def __init__(cls,logfile):
+    def __init__(cls, logfile):
         cls.logfile = logfile
-        fileObject = open(cls.logfile,'a')
+        fileObject = open(cls.logfile, 'a')
         timeStamp = "\n[%s] Initializing Log\n"%(ctime())
         fileObject.write(timeStamp)
         fileObject.close()
@@ -61,21 +61,21 @@ class Logger(object):
         cls.lastEvent = timeStamp
 
     @classmethod
-    def log_function_call(cls,event):
+    def log_function_call(cls, event):
         '''
         Main function to log function calls.  Takes one event and multiple args/kwargs.
         '''
         def wrap(f):
             @wraps(f)
             def decorator(*args,**kwargs):
-                if hasattr(cls,'logfile'):
+                if hasattr(cls, 'logfile'):
                     if cls.lastEvent == event:
                         # just called this function; don't log
                         pass
                     else:
                         cls.lastEvent = event
-                        fileObject = open(cls.logfile,'a')
-                        header = "[%s]  %s\n"%(ctime(),event)
+                        fileObject = open(cls.logfile, 'a')
+                        header = "[%s]  %s\n"%(ctime(), event)
                         fileObject.write(header)
                         if len(kwargs) > 0:
                             footer = "%s"%(create_footer(kwargs))
@@ -83,13 +83,13 @@ class Logger(object):
                         fileObject.close()
                 else:
                     pass
-                return f(*args,**kwargs)
+                return f(*args, **kwargs)
             return decorator
         return wrap
 
 
 class LogIOException(IOError):
     def __init__(self):
-        print "There is a problem with your log file.  Check the path and file name."
+        print("There is a problem with your log file.  Check the path and file name.")
 
 

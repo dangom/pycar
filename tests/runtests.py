@@ -2793,7 +2793,7 @@ class DictImporter(object):
         self.sources = sources
 
     def find_module(self, fullname, path=None):
-        if fullname == "argparse" and sys.version_info >= (2,7):
+        if fullname == "argparse" and sys.version_info >= (2, 7):
             # we were generated with <python2.7 (which pulls in argparse)
             # but we are running now on a stdlib which has it, so use that.
             return None
@@ -2836,7 +2836,7 @@ if __name__ == "__main__":
         sources = sources.encode("ascii") # ensure bytes
         sources = pickle.loads(zlib.decompress(base64.decodebytes(sources)))
     else:
-        import cPickle as pickle
+        import pickle as pickle
         exec("def do_exec(co, loc): exec co in loc\n")
         sources = pickle.loads(zlib.decompress(base64.decodestring(sources)))
 

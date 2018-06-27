@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from distutils.core import setup, Command
+from setuptools import setup
 
 class PyTest(Command):
     user_options =[]
@@ -23,7 +24,7 @@ setup(name='pycar',
       packages=['pycar'],
       package_dir={'pycar': ''},
       package_data={'pycar' : ['tests/runtests.py', 'tests/test_raicar_pytest.py', 'tests/test_bicar_pytest.py', 'tests/bicartestdata.db', 'tests/icatestsignals.db']},
-      install_requires = ['pyica'],
+      # install_requires = ['pyica'],
       cmdclass = {'test': PyTest},
       license='BSD-3',
       classifiers = [
@@ -31,5 +32,5 @@ setup(name='pycar',
           'Intended Audience :: Developers',
           'Intended Audience :: Scientists',
           'Progamming Language :: Python',
-        ],
-     )
+      ],
+)

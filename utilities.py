@@ -12,76 +12,84 @@ from scipy import signal
 from numpy import sort, int, floor, ceil, interp, std
 from os import path
 
-def empirical_ci(y,alpha=0.05):
-	"""Computes an empirical (alpha/2,1-alpha/2) confidence interval for the distributional data in x.
 
-	Parameters:
-	------------
-	x : numpy array, required
-		set of data to produce empirical upper/lower bounds for
+def empirical_ci(y, alpha=0.05):
+    """Computes an empirical (alpha/2,1-alpha/2) confidence interval for the
+    distributional data in x.
 
-	alpha : float, optional
-		sets desired CI range
+    Parameters:
+    ------------
+    x : numpy array, required
+            set of data to produce empirical upper/lower bounds for
 
-	Returns:
-	------------
-	lb, ub : floats, lower and upper bounds for x
+    alpha : float, optional
+            sets desired CI range
 
-	"""
-	ytilde = sort(y)
-	xl = (alpha/2)*len(y)
-	xu = (1.0 - alpha/2)*len(y)
-	l1 = int(floor(xl))
-	l2 = int(ceil(xl))
-	u1 = int(floor(xu))
-	u2 = int(ceil(xu))
-	lb = interp(xl, [l1, l2], [ytilde[l1], ytilde[l2]])
-	ub = interp(xu, [u1, u2], [ytilde[u1], ytilde[u2]])
-	return lb, ub
+    Returns:
+    ------------
+    lb, ub : floats, lower and upper bounds for x
+
+    """
+    ytilde = sort(y)
+    xl = (alpha/2)*len(y)
+    xu = (1.0 - alpha/2)*len(y)
+    l1 = int(floor(xl))
+    l2 = int(ceil(xl))
+    u1 = int(floor(xu))
+    u2 = int(ceil(xu))
+    lb = interp(xl, [l1, l2], [ytilde[l1], ytilde[l2]])
+    ub = interp(xu, [u1, u2], [ytilde[u1], ytilde[u2]])
+    return lb, ub
 
 
-def standardize(X,stdtype='column'):
-	"""Standardizes a two dimensional input matrix X, by either row or column.  Resulting matrix will have 
-	row or column mean 0 and row or column std. dev. equal to 1.0."""
-	if len(X.shape) > 2:
-		print('ERROR: standardize() not defines for matrices that are not two-dimenional')
-		return
-	if stdtype == 'column':
-		F = signal.detrend(X, type='constant', axis=0)
-		F = F/std(F, axis=0)
-	else:
-	    F = signal.detrend(X.T, type='constant', axis=0)
-	    F = F/std(F, axis=0)
-	    F = F.T
-	return F
+def standardize(X, stdtype='column'):
+    """Standardizes a two dimensional input matrix X, by either row or column.
+    Resulting matrix will have row or column mean 0 and row or column std. dev.
+    equal to 1.0."""
+    if len(X.shape) > 2:
+        print('ERROR: standardize() not defines for matrices that are not two-dimensional')
+        return
+    if stdtype == 'column':
+        F = signal.detrend(X, type='constant', axis=0)
+        F = F/std(F, axis=0)
+    else:
+        F = signal.detrend(X.T, type='constant', axis=0)
+        F = F/std(F, axis=0)
+        F = F.T
+    return F
+
 
 def corrmatrix(X, Y):
-    """For two data matrices X (M x T) and Y (N x T), corrmatrix(X,Y) computes the M x N set of pearson correlation 
-    coefficients between all the rows of X and the rows of Y.  X and Y must have the same column dimension for
-    this to work."""
+    """For two data matrices X (M x T) and Y (N x T), corrmatrix(X,Y) computes
+    the M x N set of pearson correlation coefficients between all the rows of X
+    and the rows of Y. X and Y must have the same column dimension for this to
+    work."""
     assert X.shape[1] == Y.shape[1]
     # row standardize X and Y
     X = (X - X.mean(axis=1)[:, np.newaxis])/X.std(axis=1)[:, np.newaxis]
     Y = (Y - Y.mean(axis=1)[:, np.newaxis])/Y.std(axis=1)[:, np.newaxis]
     return np.dot(X, Y.T)/X.shape[1]
 
+
 def deconstruct_file_name(name):
-    """Simple function to break apart a file name into individual pieces without the extension"""
+    """Simple function to break apart a file name into individual pieces
+    without the extension"""
     return path.splitext(path.split(name)[1])[0].split('_')
+
 
 def construct_file_name(base, num, ext):
     """Simple function to create a file name of the form: base_num.ext"""
-    return base+'_'+str(num)+'.'+ext 
+    return base+'_'+str(num)+'.'+ext
 
-def compute_unit_histogram(self,unitData,nBins=None):
-	'''
-	Computes a histogram of data bounded in [0,1] - for example absolute values of realization
-	cross-correlation coefficients.'''
-	rPDF = dict.fromkeys(['bin edges', 'counts', 'bar width'])
-	if nBins is None:
-		nBins = 101
-	rPDF['bin edges'] = np.linspace(0, 1.0, nBins)
-	rPDF['counts'], _ = histogram(unitData, bins=rPDF['bin edges'])
-	rPDF['bin edges'] = rPDF['bin edges'][0:-1]
-	rPDF['bar width'] = 1.0/nBins
-	return rPDF
+
+def compute_unit_histogram(self, unitData, nBins=None):
+    ''' Computes a histogram of data bounded in [0,1] - for example absolute
+    values of realization cross-correlation coefficients.'''
+    rPDF = dict.fromkeys(['bin edges', 'counts', 'bar width'])
+    if nBins is None:
+        nBins = 101
+    rPDF['bin edges'] = np.linspace(0, 1.0, nBins)
+    rPDF['counts'], _ = np.histogram(unitData, bins=rPDF['bin edges'])
+    rPDF['bin edges'] = rPDF['bin edges'][0:-1]
+    rPDF['bar width'] = 1.0/nBins
+    return rPDF

@@ -246,7 +246,7 @@ class RAICAR(object):
             whichComp = pi if rowMax > colMax else qi
             toAlign.append((r, whichComp))
         toAlign.sort()
-        return list(zip(*toAlign)[1])
+        return list(list(zip(*toAlign))[1])
 
     def reduce_rab(self, toAlign):
         '''
@@ -382,13 +382,11 @@ class RAICAR(object):
                 A, W, S = self.ica(
                     X, nSources=self.nSignals, **self.icaOptions)
                 # write the results to a PyTable
-                h5Ptr = tb.open_file(
-                    icaFile, mode="w", title='ICA Realization')
-                decomps = h5Ptr.create_group(
-                    h5Ptr.root, 'decomps', 'ICA Decompositions')
-                h5Ptr.create_array(decomps, 'sources', S, "S")
-                h5Ptr.create_array(decomps, 'mixing', A, "A")
-                h5Ptr.close()
+                with tb.open_file(icaFile, mode="w", title='ICA Realization') as h5Ptr:
+                    decomps = h5Ptr.create_group(
+                        h5Ptr.root, 'decomps', 'ICA Decompositions')
+                    h5Ptr.create_array(decomps, 'sources', S, "S")
+                    h5Ptr.create_array(decomps, 'mixing', A, "A")
             else:
                 print('ICA realization %s already exists.  Skipping.' % icaFile)
 
@@ -409,24 +407,20 @@ class RAICAR(object):
         if len(icaFiles) == 0:
             raise RAICARICAException
         for fi in icaFiles:
-            fiPtr = tb.open_file(os.path.join(self.icaDirectory, fi), 'r')
-            si = fiPtr.get_node('/decomps/sources').read()
-            fiPtr.close()
+            with tb.open_file(os.path.join(self.icaDirectory, fi), 'r') as fiPtr:
+                si = fiPtr.get_node('/decomps/sources').read()
             i = np.int(deconstruct_file_name(fi)[1])
             print('Working on R(%d,b)' % i)
             for fj in icaFiles:
                 j = np.int(deconstruct_file_name(fj)[1])
                 if j > i:
                     # sources assumed to have unit std. dev. but nonzero mean - will behave badly if not!
-                    fjPtr = tb.open_file(os.path.join(
-                        self.icaDirectory, fj), 'r')
-                    sj = fjPtr.get_node('/decomps/sources').read()
-                    fjPtr.close()
+                    with tb.open_file(os.path.join(self.icaDirectory, fj), 'r') as fjPtr:
+                        sj = fjPtr.get_node('/decomps/sources').read()
                     self.RabDict[(i, j)] = np.abs(corrmatrix(si, sj))
         # pickle the result
-        rabPtr = open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'wb')
-        pickle.dump(self.RabDict, rabPtr, protocol=-1)
-        rabPtr.close()
+        with open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'wb') as rabPtr:
+            pickle.dump(self.RabDict, rabPtr, protocol=-1)
 
     def compute_scc_histogram(self):
         '''
@@ -436,9 +430,8 @@ class RAICAR(object):
             raise RAICARRabException
         if not os.path.exists(os.path.join(self.rabDirectory, 'rabmatrix.db')):
             raise RAICARRabException
-        rabPtr = open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'rb')
-        RabDict = pickle.load(rabPtr)
-        rabPtr.close()
+        with open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'rb') as rabPtr:
+            RabDict = pickle.load(rabPtr)
         rPDF = dict.fromkeys(['bin edges', 'counts', 'bar width'])
         rPDF['bin edges'] = np.linspace(0, 1.0, 101)
         rPDF['counts'], _ = histogram(a=np.hstack(list(RabDict.values())[
@@ -464,10 +457,8 @@ class RAICAR(object):
             if not os.path.exists(os.path.join(self.rabDirectory, 'rabmatrix.db')):
                 raise RAICARRabException
             else:
-                rabPtr = open(os.path.join(
-                    self.rabDirectory, 'rabmatrix.db'), 'rb')
-                self.RabDict = pickle.load(rabPtr)
-                rabPtr.close()
+                with open(os.path.join(self.rabDirectory, 'rabmatrix.db'), 'rb') as rabPtr:
+                    self.RabDict = pickle.load(rabPtr)
         if not os.path.exists(self.alnDirectory):
             try:
                 os.mkdir(self.alnDirectory)
@@ -476,10 +467,8 @@ class RAICAR(object):
         gc.collect()
         # need to know how many components to calculate (if any runs exist,
         #    the zeroth one will)
-        f0Ptr = tb.open_file(os.path.join(
-            self.icaDirectory, 'icaRun_0.h5'), 'r')
-        s0 = f0Ptr.get_node('/decomps/sources').read()
-        f0Ptr.close()
+        with tb.open_file(os.path.join(self.icaDirectory, 'icaRun_0.h5'), 'r') as f0Ptr:
+            s0 = f0Ptr.get_node('/decomps/sources').read()
         nComp = s0.shape[0]
         del s0
         for k in range(0, nComp):
@@ -492,9 +481,8 @@ class RAICAR(object):
         # correct the alignment to use actual and not relative indices
         self.correct_alignment()
         # save the alignment
-        fPtr = open(os.path.join(self.alnDirectory, 'alignments.db'), 'wb')
-        pickle.dump(self.alignDict, fPtr, protocol=-1)
-        fPtr.close()
+        with open(os.path.join(self.alnDirectory, 'alignments.db'), 'wb') as fPtr:
+            pickle.dump(self.alignDict, fPtr, protocol=-1)
 
     @log_function_call('Aligning component')
     def align_component(self, k):
@@ -514,10 +502,8 @@ class RAICAR(object):
             if not os.path.exists(os.path.join(self.alnDirectory, 'alignments.db')):
                 raise RAICARAlignmentException
             else:
-                alnPtr = open(os.path.join(
-                    self.alnDirectory, 'alignments.db'), 'rb')
-                self.alignDict = pickle.load(alnPtr)
-                alnPtr.close()
+                with open(os.path.join(self.alnDirectory, 'alignments.db'), 'rb') as alnPtr:
+                    self.alignDict = pickle.load(alnPtr)
         if k not in self.alignDict:
             print('Error.  Requested component %d does not exist.' % k)
             return
@@ -530,23 +516,21 @@ class RAICAR(object):
         for fi in icaFiles:
             print('Working on file %s' % fi)
             i = np.int(deconstruct_file_name(fi)[1])
-            h5Ptr = tb.open_file(os.path.join(self.icaDirectory, fi), 'r')
-            sourcesToAlign.append(
-                h5Ptr.root.decomps.sources[self.alignDict[k][i], :])  # source to fetch
-            mixColsToAlign.append(
-                h5Ptr.root.decomps.mixing[:, self.alignDict[k][i]])  # mixing element
-            h5Ptr.close()
+            with tb.open_file(os.path.join(self.icaDirectory, fi), 'r') as h5Ptr:
+                sourcesToAlign.append(
+                    h5Ptr.root.decomps.sources[self.alignDict[k][i], :])  # source to fetch
+                mixColsToAlign.append(
+                    h5Ptr.root.decomps.mixing[:, self.alignDict[k][i]])  # mixing element
         # source is aligned, form the aligned source and mixing matrix
         alignedSources = np.vstack(sourcesToAlign)
         alignedMixing = np.vstack(mixColsToAlign).T
         fileName = os.path.join(
             self.alnDirectory, construct_file_name('alnRun', k, 'h5'))
-        h5Ptr = tb.open_file(fileName, mode="w", title='Aligned Component')
-        aligned = h5Ptr.create_group(
-            h5Ptr.root, 'aligned', 'Aligned Component')
-        h5Ptr.create_array(aligned, 'sources', alignedSources, "S")
-        h5Ptr.create_array(aligned, 'mixing', alignedMixing, "A")
-        h5Ptr.close()
+        with tb.open_file(fileName, mode="w", title='Aligned Component') as h5Ptr:
+            aligned = h5Ptr.create_group(
+                h5Ptr.root, 'aligned', 'Aligned Component')
+            h5Ptr.create_array(aligned, 'sources', alignedSources, "S")
+            h5Ptr.create_array(aligned, 'mixing', alignedMixing, "A")
 
     @log_function_call('Constructing RAICAR components')
     def construct_raicar_components(self):
@@ -570,10 +554,9 @@ class RAICAR(object):
         repro = []
         for f in alnFiles:
             print('Constructing raicar comfponent from file %s' % f)
-            fPtr = tb.open_file(f, 'r')
-            sc = fPtr.get_node('/aligned/sources').read()
-            ac = fPtr.get_node('/aligned/mixing').read()
-            fPtr.close()
+            with tb.open_file(f, 'r') as fPtr:
+                sc = fPtr.get_node('/aligned/sources').read()
+                ac = fPtr.get_node('/aligned/mixing').read()
             if self.canonSigns:
                 sc, ac = self.canonicalize_signs(sc, ac)
             methodToUse = self.avgMethod+'_average_aligned_runs'
@@ -588,17 +571,15 @@ class RAICAR(object):
         # adjust std. dev. of RAICAR sources
         self.raicarSources = standardize(self.raicarSources, stdtype='row')
         # save the result, PyTables again
-        h5Ptr = tb.open_file(os.path.join(
-            self.racDirectory, 'components.h5'), mode="w", title='RAICAR Component')
-        raicar = h5Ptr.create_group(h5Ptr.root, 'raicar', 'RAICAR Component')
-        h5Ptr.create_array(raicar, 'sources', self.raicarSources, "S")
-        h5Ptr.create_array(raicar, 'mixing', self.raicarMixing, "A")
-        h5Ptr.close()
+        with tb.open_file(os.path.join(
+            self.racDirectory, 'components.h5'), mode="w", title='RAICAR Component') as h5Ptr:
+            raicar = h5Ptr.create_group(h5Ptr.root, 'raicar', 'RAICAR Component')
+            h5Ptr.create_array(raicar, 'sources', self.raicarSources, "S")
+            h5Ptr.create_array(raicar, 'mixing', self.raicarMixing, "A")
         # this can just be pickled - it's not that large
-        fPtr = open(os.path.join(self.racDirectory,
-                                 'reproducibility.db'), 'wb')
-        pickle.dump(self.reproducibility, fPtr, protocol=-1)
-        fPtr.close()
+        with open(os.path.join(self.racDirectory,
+                                 'reproducibility.db'), 'wb') as fPtr:
+            pickle.dump(self.reproducibility, fPtr, protocol=-1)
 
     def read_raicar_components(self):
         '''
@@ -611,10 +592,9 @@ class RAICAR(object):
             raise RAICARComponentException
         # file exists and presumably has something in it
         compFileName = os.path.join(self.racDirectory, 'components.h5')
-        h5Ptr = tb.open_file(compFileName, mode="r")
-        sources = h5Ptr.get_node('/raicar/sources').read()
-        mixing = h5Ptr.get_node('/raicar/mixing').read()
-        h5Ptr.close()
+        with tb.open_file(compFileName, mode="r") as h5Ptr:
+            sources = h5Ptr.get_node('/raicar/sources').read()
+            mixing = h5Ptr.get_node('/raicar/mixing').read()
         return sources, mixing
 
     def read_reproducibility(self):
@@ -626,10 +606,9 @@ class RAICAR(object):
             raise RAICARDirectoryExistException(self.racDirectory)
         elif not os.path.exists(os.path.join(self.racDirectory, 'reproducibility.db')):
             raise RAICARComponentException
-        fPtr = open(os.path.join(self.racDirectory,
-                                 'reproducibility.db'), 'rb')
-        repro = pickle.load(fPtr)
-        fPtr.close()
+        with open(os.path.join(self.racDirectory,
+                                 'reproducibility.db'), 'rb') as fPtr:
+            repro = pickle.load(fPtr)
         return repro
 
     def runall(self, X):
